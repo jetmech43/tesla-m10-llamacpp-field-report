@@ -1,0 +1,21 @@
+# Example systemd drop-in to run one llama-server lane on the patched Maxwell binary.
+#
+# Install as:  /etc/systemd/system/<lane-unit>.service.d/zz-m10-patch.conf
+#   - the "zz-" prefix sorts LAST, so this ExecStart wins over any pre-existing drop-in
+#   - derive the ExecStart below from the lane's LIVE ExecStart and swap ONLY argv[0]
+#     (the binary), keeping that lane's own -m / --mmproj / ngl / ctx / port args verbatim:
+#
+#       systemctl show -p ExecStart --value <lane-unit> | tr ';' '\n' | sed -n 's/^ *argv\[\]=//p'
+#
+# Rollback:  rm this file  ->  systemctl daemon-reload  ->  systemctl restart <lane-unit>
+#            (the lane falls back to stock mainline /opt/llama.cpp)
+
+[Service]
+# Point the loader at the patched binary's bundled shared libs (libggml*, libllama*, ...).
+Environment=LD_LIBRARY_PATH=/opt/llama-m10/bin
+
+# Clear the inherited ExecStart, then set the patched one. The path below is the ONLY change
+# from the lane's stock ExecStart — every model/arg flag is copied from the live unit.
+ExecStart=
+ExecStart=/opt/llama-m10/bin/llama-server -m /opt/llama-models/<this-lane-model>.gguf --host 127.0.0.1 --port <PORT> -ngl 99 -c <CTX> --alias <ALIAS>
+# vision lane only: append its existing --mmproj /opt/llama-models/<this-lane>.mmproj.gguf
